@@ -6,80 +6,81 @@
  * Licensed under the MIT license.
  */
 /*jshint es5:true*/
-module.exports = function(grunt) {
-  var Q = require('q');
-  var lpad = require('lpad');
+module.exports = function (grunt) {
+	var Q = require('q');
 
-  function spawn(task) {
-    var deferred = Q.defer();
+	function spawn(task) {
+		var deferred = Q.defer();
 
-    grunt.util.spawn(task, function(error, result, code) {
-      grunt.log.writeln();
-      lpad.stdout('    ');
+		var startTime = new Date().getMilliseconds();
+		grunt.log.writeln('Task started' + task);
 
-      if (error || code !== 0) {
-        var message = result.stderr || result.stdout;
+		grunt.util.spawn(task, function (error, result, code) {
+			grunt.log.writeln();
 
-        grunt.log.error(message);
-        lpad.stdout();
+			if (error || code !== 0) {
+				var message = result.stderr || result.stdout;
 
-        return deferred.reject();
-      }
+				grunt.log.error(message);
 
-      grunt.log.writeln(result);
-      lpad.stdout();
+				return deferred.reject();
+			}
 
-      deferred.resolve();
-    });
+			grunt.log.writeln(result);
 
-    return deferred.promise;
-  }
+			grunt.log.writeln('TIME TAKEN FOR ' + task + '[' + (new Date().getMilliseconds() - startTime) + ']');
 
-  grunt.registerMultiTask('parallel', 'Run sub-tasks in parallel.', function() {
-    var done = this.async();
-    var options = this.options({
-      grunt: false,
-      stream: false
-    });
-    var flags = grunt.option.flags();
+			deferred.resolve();
+		});
 
-    // If the configuration specifies that the task is a grunt task. Make it so.
-    if (options.grunt === true) {
-      this.data.tasks = this.data.tasks.map(function(task) {
-        return {
-          args: [task],
-          grunt: true
-        }
-      });
-    }
+		return deferred.promise;
+	}
 
-    // Normalize tasks config.
-    this.data.tasks = this.data.tasks.map(function(task) {
+	grunt.registerMultiTask('parallel', 'Run sub-tasks in parallel.', function () {
+		var done = this.async();
+		var options = this.options({
+			grunt: false,
+			stream: false
+		});
+		var flags = grunt.option.flags();
 
-      // Default to grunt it a command isn't specified
-      if ( ! task.cmd ) {
-        task.grunt = true;
-      }
+		// If the configuration specifies that the task is a grunt task. Make it so.
+		if (options.grunt === true) {
+			this.data.tasks = this.data.tasks.map(function (task) {
+				return {
+					args: [task],
+					grunt: true
+				}
+			});
+		}
 
-      // Pipe to the parent stdout when streaming.
-      if ( task.stream || ( task.stream === undefined && options.stream ) ) {
-        task.opts = task.opts || {};
-        task.opts.stdio = 'inherit';
-      }
+		// Normalize tasks config.
+		this.data.tasks = this.data.tasks.map(function (task) {
 
-      return task;
-    });
+			// Default to grunt it a command isn't specified
+			if (!task.cmd) {
+				task.grunt = true;
+			}
 
-    // Allow any flags to be passed to spawned tasks
-    // This includes the verbose flag as well as any custom task flags
-    this.data.tasks.forEach(function ( task ) {
-      if ( task.grunt ) {
-        flags.forEach(function ( flag ) {
-          task.args.push( flag );
-        });
-      }
-    });
+			// Pipe to the parent stdout when streaming.
+			if (task.stream || (task.stream === undefined && options.stream)) {
+				task.opts = task.opts || {};
+				task.opts.stdio = 'inherit';
+			}
 
-    Q.all(this.data.tasks.map(spawn)).then(done, done.bind(this, false));
-  });
+			return task;
+		});
+
+		// Allow any flags to be passed to spawned tasks
+		// This includes the verbose flag as well as any custom task flags
+		this.data.tasks.forEach(function (task) {
+			if (task.grunt) {
+				flags.forEach(function (flag) {
+					task.args.push(flag);
+				});
+			}
+		});
+
+		Q.all(this.data.tasks.map(spawn)).then(done, done.bind(this, false));
+	});
 };
